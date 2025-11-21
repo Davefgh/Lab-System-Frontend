@@ -1,4 +1,4 @@
-import api from '@/boot/axios'
+import { apiService } from './api'
 
 export interface ScheduleFormData {
   laboratory_id: string
@@ -7,7 +7,7 @@ export interface ScheduleFormData {
   section: string
   start_time: string
   end_time: string
-  status?: string
+  status: 'active' | 'inactive' | null
 }
 
 export interface ScheduleApiResponse {
@@ -18,21 +18,21 @@ export interface ScheduleApiResponse {
 export const scheduleService = {
   // CREATE NEW SCHEDULE
   createSchedule: async (scheduleData: ScheduleFormData) => {
-    return api.post<ScheduleApiResponse>('/schedules', scheduleData)
+    return apiService.post<ScheduleApiResponse>('/schedules', scheduleData)
   },
 
   // GET ALL SCHEDULES
   getSchedules: async () => {
-    return api.get<ScheduleApiResponse>('/schedules')
+    return apiService.get<ScheduleApiResponse>('/schedules')
   },
 
   // UPDATE SCHEDULE
   updateSchedule: async (id: string, scheduleData: Partial<ScheduleFormData>) => {
-    return api.put<ScheduleApiResponse>(`/schedules/${id}`, scheduleData)
+    return apiService.put<ScheduleApiResponse>(`/schedules/${id}`, scheduleData)
   },
 
   // DELETE SCHEDULE
   deleteSchedule: async (id: string) => {
-    return api.delete<ScheduleApiResponse>(`/schedules/${id}`)
+    return apiService.delete<ScheduleApiResponse>(`/schedules/${id}`)
   },
 }

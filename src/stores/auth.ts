@@ -2,7 +2,7 @@ import type { User } from '@/interfaces/interfaces'
 // IMPORTS
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import api from '@/boot/axios'
+import api, { setAuthToken } from '@/boot/axios'
 
 // AUTH STORE DEFINITION
 export const useAuthStore = defineStore('auth', () => {
@@ -10,6 +10,12 @@ export const useAuthStore = defineStore('auth', () => {
   // CURRENT AUTHENTICATED USER - INITIALIZE FROM LOCALSTORAGE IF AVAILABLE
   const storedUser = localStorage.getItem('user')
   const user = ref<User | null>(storedUser ? JSON.parse(storedUser) : null)
+
+  // RESTORE AUTH TOKEN FROM LOCALSTORAGE IF AVAILABLE
+  const storedToken = localStorage.getItem('token')
+  if (storedToken) {
+    setAuthToken(storedToken)
+  }
 
   // COMPUTED PROPERTIES
   // CHECK IF USER IS AUTHENTICATED
@@ -29,6 +35,12 @@ export const useAuthStore = defineStore('auth', () => {
 
       // SET USER DATA FROM API RESPONSE
       user.value = response.data.user
+
+      // SET AUTH TOKEN IF PROVIDED
+      if (response.data.token) {
+        setAuthToken(response.data.token)
+        localStorage.setItem('token', response.data.token)
+      }
 
       // PERSIST USER TO LOCALSTORAGE
       localStorage.setItem('user', JSON.stringify(response.data.user))
@@ -57,6 +69,8 @@ export const useAuthStore = defineStore('auth', () => {
       // CLEAR LOCAL USER DATA REGARDLESS OF API RESPONSE
       user.value = null
       localStorage.removeItem('user')
+      localStorage.removeItem('token')
+      setAuthToken(null)
     }
   }
 
