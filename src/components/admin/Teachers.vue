@@ -237,9 +237,13 @@ async function addSchedule() {
 				)}`;
 			}
 
-			// Format dates as ISO strings without timezone
-			const startDateTime = `${formattedDate} ${newSchedule.value.startTime}:00`;
-			const endDateTime = `${formattedDate} ${newSchedule.value.endTime}:00`;
+			// Create proper Date objects and convert to ISO strings
+			const startDateTimeStr = `${formattedDate}T${newSchedule.value.startTime}:00`;
+			const endDateTimeStr = `${formattedDate}T${newSchedule.value.endTime}:00`;
+
+			// Convert to ISO 8601 format with timezone
+			const startDateTime = new Date(startDateTimeStr).toISOString();
+			const endDateTime = new Date(endDateTimeStr).toISOString();
 
 			const scheduleData = {
 				laboratory_id: newSchedule.value.room, // Keep as string
