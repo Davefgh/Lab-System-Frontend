@@ -9,6 +9,7 @@ import { useTeacherStore } from "@/stores/teachers";
 import type { Teacher } from "@/interfaces/interfaces";
 
 import { useScheduleStore } from "@/stores/schedules";
+import { useSubjectStore } from "@/stores/subjects";
 
 // CONSTANTS
 const todaySchedule = [
@@ -61,13 +62,16 @@ const newSchedule = ref({
 // STORE INITIALIZATION
 const teacherStore = useTeacherStore();
 const scheduleStore = useScheduleStore();
+const subjectStore = useSubjectStore();
 
 // COMPUTED PROPERTIES
 const teachers = computed(() => teacherStore.teachers);
+const subjects = computed(() => subjectStore.subjects);
 
-//  FETCH TEACHERS ON COMPONENT MOUNT
+//  FETCH TEACHERS AND SUBJECTS ON COMPONENT MOUNT
 onMounted(() => {
 	teacherStore.fetchTeachers();
+	subjectStore.fetchSubjects();
 });
 
 // FILTER TEACHERS BY SEARCH QUERY
@@ -125,6 +129,8 @@ async function saveTeacher(teacherData: any) {
 			if (result.success) {
 				showNotification("Teacher added successfully!", "success");
 			} else {
+				console.error("Full error object:", result.error);
+				console.error("Error response data:", result.error?.response?.data);
 				let errorMsg = "Failed to add teacher. Please try again.";
 				const err = result.error;
 				if (err?.response?.data) {
@@ -206,6 +212,8 @@ async function deleteTeacher(teacherId: string) {
 
 // ADD NEW SCHEDULE FOR TEACHER
 async function addSchedule() {
+	console.log("Form values before validation:", newSchedule.value);
+
 	// VALIDATE ALL REQUIRED FIELDS
 	if (
 		newSchedule.value.teacherId &&
@@ -218,15 +226,25 @@ async function addSchedule() {
 	) {
 		isScheduleLoading.value = true;
 		try {
-			// Format dates as ISO strings (combining date and time)
-			// Assuming backend expects ISO string or similar
-			const startDateTime = `${newSchedule.value.date}T${newSchedule.value.startTime}:00`;
-			const endDateTime = `${newSchedule.value.date}T${newSchedule.value.endTime}:00`;
+			// Handle date format - could be YYYY-MM-DD or MM/DD/YYYY
+			let formattedDate = newSchedule.value.date;
+			if (formattedDate.includes("/")) {
+				// Convert from MM/DD/YYYY to YYYY-MM-DD
+				const dateParts = formattedDate.split("/");
+				formattedDate = `${dateParts[2]}-${dateParts[0].padStart(2, "0")}-${dateParts[1].padStart(
+					2,
+					"0"
+				)}`;
+			}
+
+			// Format dates as ISO strings without timezone
+			const startDateTime = `${formattedDate} ${newSchedule.value.startTime}:00`;
+			const endDateTime = `${formattedDate} ${newSchedule.value.endTime}:00`;
 
 			const scheduleData = {
-				laboratory_id: newSchedule.value.room,
-				teacher_id: newSchedule.value.teacherId,
-				subject_id: newSchedule.value.subject, // Assuming subject input is the ID/Code
+				laboratory_id: newSchedule.value.room, // Keep as string
+				teacher_id: newSchedule.value.teacherId, // Keep as string
+				subject_id: newSchedule.value.subject, // Rename to subject_id
 				section: newSchedule.value.section,
 				start_time: startDateTime,
 				end_time: endDateTime,
@@ -234,6 +252,11 @@ async function addSchedule() {
 			};
 
 			console.log("Adding Schedule:", scheduleData);
+			console.log("Schedule Data Types:", {
+				laboratory_id: typeof scheduleData.laboratory_id,
+				teacher_id: typeof scheduleData.teacher_id,
+				subject: typeof scheduleData.subject,
+			});
 			const result = await scheduleStore.addSchedule(scheduleData);
 
 			if (result.success) {
@@ -437,12 +460,15 @@ async function addSchedule() {
 					</div>
 					<div>
 						<label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-						<input
+						<select
 							v-model="newSchedule.subject"
-							type="text"
-							placeholder="Enter Subject"
 							class="block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#4299e1] focus:border-[#4299e1]"
-						/>
+						>
+							<option value="">Select Subject</option>
+							<option v-for="subject in subjects" :key="subject.id" :value="subject.id">
+								{{ subject.subject_name }} ({{ subject.subject_code }})
+							</option>
+						</select>
 					</div>
 					<div>
 						<label class="block text-sm font-medium text-gray-700 mb-1">Section</label>
