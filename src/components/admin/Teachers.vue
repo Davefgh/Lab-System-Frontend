@@ -4,6 +4,7 @@ import { Plus, User } from "lucide-vue-next";
 import { computed, onMounted, ref } from "vue";
 import SearchFilterBar from "@/components/global/SearchFilterBar.vue";
 import AddEditTeacherModal from "@/components/modals/AddEditTeacherModal.vue";
+import ToastNotification from "@/components/global/ToastNotification.vue";
 import { useTeacherStore } from "@/stores/teachers";
 import type { Teacher } from "@/interfaces/interfaces";
 
@@ -38,6 +39,11 @@ const showModal = ref(false);
 const modalMode = ref<"add" | "edit">("add");
 const selectedTeacher = ref<Teacher | null>(null);
 const isLoading = ref(false);
+
+// TOAST NOTIFICATION STATE
+const toastMessage = ref("");
+const toastType = ref<"success" | "error">("success");
+const showToast = ref(false);
 
 const newSchedule = ref({
 	teacherId: "",
@@ -91,6 +97,18 @@ function closeModal() {
 	selectedTeacher.value = null;
 }
 
+// SHOW TOAST NOTIFICATION
+function showNotification(message: string, type: "success" | "error") {
+	toastMessage.value = message;
+	toastType.value = type;
+	showToast.value = true;
+}
+
+// CLOSE TOAST NOTIFICATION
+function closeToast() {
+	showToast.value = false;
+}
+
 // SAVE TEACHER (ADD OR EDIT)
 async function saveTeacher(teacherData: any) {
 	isLoading.value = true;
@@ -98,16 +116,21 @@ async function saveTeacher(teacherData: any) {
 		if (modalMode.value === "add") {
 			const result = await teacherStore.addTeacher(teacherData);
 			if (result.success) {
-				console.log("Teacher added successfully");
+				showNotification("Teacher added successfully!", "success");
+			} else {
+				showNotification("Failed to add teacher. Please try again.", "error");
 			}
 		} else if (selectedTeacher.value) {
 			const result = await teacherStore.updateTeacher(selectedTeacher.value.id, teacherData);
 			if (result.success) {
-				console.log("Teacher updated successfully");
+				showNotification("Teacher updated successfully!", "success");
+			} else {
+				showNotification("Failed to update teacher. Please try again.", "error");
 			}
 		}
 	} catch (error) {
 		console.error("Error saving teacher:", error);
+		showNotification("An error occurred. Please try again.", "error");
 	} finally {
 		isLoading.value = false;
 	}
@@ -121,10 +144,13 @@ async function deleteTeacher(teacherId: string) {
 		try {
 			const result = await teacherStore.removeTeacher(teacherId);
 			if (result.success) {
-				console.log("Teacher deleted successfully");
+				showNotification("Teacher deleted successfully!", "success");
+			} else {
+				showNotification("Failed to delete teacher. Please try again.", "error");
 			}
 		} catch (error) {
 			console.error("Error deleting teacher:", error);
+			showNotification("An error occurred. Please try again.", "error");
 		} finally {
 			isLoading.value = false;
 		}
@@ -351,6 +377,14 @@ function addSchedule() {
 			:mode="modalMode"
 			@close="closeModal"
 			@save="saveTeacher"
+		/>
+
+		<!-- TOAST NOTIFICATION -->
+		<ToastNotification
+			v-if="showToast"
+			:message="toastMessage"
+			:type="toastType"
+			@close="closeToast"
 		/>
 	</div>
 </template>

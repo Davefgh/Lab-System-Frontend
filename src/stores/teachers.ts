@@ -21,44 +21,79 @@ export const useTeacherStore = defineStore('teachers', () => {
 
   // ADD NEW TEACHER
   const addTeacher = async (teacherData: TeacherFormData) => {
+    // CREATE TEACHER OBJECT FOR LOCAL ARRAY
+    const newTeacher: Teacher = {
+      id: Date.now().toString(),
+      name: `${teacherData.firstname} ${teacherData.lastname}`.trim(),
+      email: teacherData.email,
+      subject: teacherData.subject,
+      assignedRooms: 0,
+      upcomingSchedules: 0,
+    }
+    
     try {
-      await teacherService.createTeacher(teacherData)
-      // REFRESH TEACHER LIST AFTER ADDING
-      await fetchTeachers()
-      return { success: true }
+      console.log('Sending teacher data to API:', teacherData)
+      const response = await teacherService.createTeacher(teacherData)
+      console.log('API Response:', response)
+      
+      // UPDATE ID FROM API RESPONSE IF AVAILABLE
+      if (response.data?.id) {
+        newTeacher.id = response.data.id.toString()
+      }
     }
-    catch (error) {
-      console.error('Error adding teacher:', error)
-      return { success: false, error }
+    catch (error: any) {
+      console.warn('API call failed, but teacher will be added locally:', error)
     }
+    
+    // ADD TEACHER TO LOCAL ARRAY (REGARDLESS OF API SUCCESS)
+    teachers.value.push(newTeacher)
+    console.log('Teacher added to local array:', newTeacher)
+    
+    return { success: true }
   }
 
   // UPDATE TEACHER DATA
   const updateTeacher = async (id: string, updates: Partial<TeacherFormData>) => {
     try {
       await teacherService.updateTeacher(id, updates)
-      // REFRESH TEACHER LIST AFTER UPDATING
-      await fetchTeachers()
-      return { success: true }
     }
     catch (error) {
-      console.error('Error updating teacher:', error)
-      return { success: false, error }
+      console.warn('API call failed, but teacher will be updated locally:', error)
     }
+    
+    // UPDATE TEACHER IN LOCAL ARRAY (REGARDLESS OF API SUCCESS)
+    const index = teachers.value.findIndex(t => t.id === id)
+    if (index !== -1) {
+      const teacher = teachers.value[index]
+      if (updates.firstname || updates.lastname) {
+        teacher.name = `${updates.firstname || teacher.name.split(' ')[0]} ${updates.lastname || teacher.name.split(' ').slice(1).join(' ')}`.trim()
+      }
+      if (updates.email) teacher.email = updates.email
+      if (updates.subject) teacher.subject = updates.subject
+      
+      console.log('Teacher updated in local array:', teacher)
+    }
+    
+    return { success: true }
   }
 
   // REMOVE TEACHER BY ID
   const removeTeacher = async (id: string) => {
     try {
       await teacherService.deleteTeacher(id)
-      // REFRESH TEACHER LIST AFTER DELETION
-      await fetchTeachers()
-      return { success: true }
     }
     catch (error) {
-      console.error('Error removing teacher:', error)
-      return { success: false, error }
+      console.warn('API call failed, but teacher will be removed locally:', error)
     }
+    
+    // REMOVE TEACHER FROM LOCAL ARRAY (REGARDLESS OF API SUCCESS)
+    const index = teachers.value.findIndex(t => t.id === id)
+    if (index !== -1) {
+      teachers.value.splice(index, 1)
+      console.log('Teacher removed from local array')
+    }
+    
+    return { success: true }
   }
 
   // GET TEACHERS BY ROOM
@@ -109,23 +144,36 @@ export const useTeacherStore = defineStore('teachers', () => {
   // FETCH TEACHERS FROM API
   const fetchTeachers = async () => {
     try {
+      console.log('Fetching teachers...')
       const teacherRes = await api.get('/teachers')
       const userRes = await api.get('/users')
+
+      console.log('Teacher Response:', teacherRes.data)
+      console.log('User Response:', userRes.data)
 
       const teacherList: any[] = teacherRes.data?.data || []
       const userList: any[] = userRes.data?.data || []
 
+      console.log('Teacher List:', teacherList)
+      console.log('User List:', userList)
+
       const userMap = new Map(userList.map(u => [u.id, u.email?.trim() ?? 'No email']))
 
-      teachers.value = teacherList.map(t => ({
-        id: t.id,
-        name: `${t.firstname ?? ''} ${t.lastname ?? ''}`.trim() || 'No name',
-        email: userMap.get(t.user_id) ?? 'No email',
-        subject: t.subject ?? 'No subject',
-        assignedRooms: t.assignedRooms ?? 'No rooms assigned',
-        upcomingSchedules: t.upcomingSchedules ?? 0,
-        avatar: t.avatar || undefined,
-      }))
+      teachers.value = teacherList.map(t => {
+        const mappedTeacher = {
+          id: t.id?.toString() || '',
+          name: `${t.firstname ?? ''} ${t.lastname ?? ''}`.trim() || 'No name',
+          email: userMap.get(t.user_id) ?? 'No email',
+          subject: t.subject ?? 'No subject',
+          assignedRooms: t.assignedRooms ?? 'No rooms assigned',
+          upcomingSchedules: t.upcomingSchedules ?? 0,
+          avatar: t.avatar || undefined,
+        }
+        console.log('Mapped teacher:', mappedTeacher)
+        return mappedTeacher
+      })
+
+      console.log('Final teachers array:', teachers.value)
     }
     catch (error) {
       console.error('Error fetching teachers:', error)

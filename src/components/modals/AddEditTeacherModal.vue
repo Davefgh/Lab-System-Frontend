@@ -228,9 +228,13 @@ const handleSave = () => {
 						</button>
 						<button
 							type="submit"
-							class="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+							:class="
+								mode === 'add'
+									? 'px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors'
+									: 'px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors'
+							"
 						>
-							{{ mode === "add" ? "Add Teacher" : "Save Changes" }}
+							{{ mode === "add" ? "Create" : "Save Changes" }}
 						</button>
 					</div>
 				</form>
@@ -238,3 +242,4 @@ const handleSave = () => {
 		</div>
 	</div>
 </template>
+```
