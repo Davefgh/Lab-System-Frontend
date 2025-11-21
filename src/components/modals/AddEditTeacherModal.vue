@@ -188,7 +188,7 @@ const handleSave = () => {
 									? 'border-red-300 focus:ring-red-500 focus:border-red-500'
 									: 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
 							"
-							placeholder="teacher@example.com"
+							placeholder="teacher@gmail.com"
 							:disabled="mode === 'edit'"
 						/>
 						<p v-if="errors.email" class="mt-1 text-sm text-red-600">
