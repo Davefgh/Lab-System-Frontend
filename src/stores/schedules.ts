@@ -2,6 +2,7 @@ import type { Schedule } from '@/interfaces/interfaces'
 // IMPORTS
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { scheduleService } from '@/services/scheduleService'
 
 // SCHEDULE STORE DEFINITION
 export const useScheduleStore = defineStore('schedules', () => {
@@ -80,12 +81,17 @@ export const useScheduleStore = defineStore('schedules', () => {
   }
 
   // ADD NEW SCHEDULE
-  const addSchedule = (Schedule: Omit<Schedule, 'id'>) => {
-    const newSchedule: Schedule = {
-      ...Schedule,
-      id: Date.now().toString(),
+  const addSchedule = async (scheduleData: any) => {
+    try {
+      const response = await scheduleService.createSchedule(scheduleData)
+      
+      // OPTIONAL: Add to local state if needed, or fetch all schedules again
+      // For now, we just return success
+      return { success: true, data: response.data }
+    } catch (error: any) {
+      console.error('Failed to create schedule:', error)
+      return { success: false, error }
     }
-    Schedules.value.push(newSchedule)
   }
 
   // UPDATE SCHEDULE DATA

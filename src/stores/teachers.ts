@@ -21,87 +21,82 @@ export const useTeacherStore = defineStore('teachers', () => {
 
   // ADD NEW TEACHER
   const addTeacher = async (teacherData: TeacherFormData) => {
-    // CREATE TEACHER OBJECT FOR LOCAL ARRAY
-    const newTeacher: Teacher = {
-      id: Date.now().toString(),
-      name: `${teacherData.firstname} ${teacherData.lastname}`.trim(),
-      email: teacherData.email,
-      subject: teacherData.subject,
-      assignedRooms: 0,
-      upcomingSchedules: 0,
-    }
-    
     try {
       console.log('Sending teacher data to API:', teacherData)
       const response = await teacherService.createTeacher(teacherData)
       console.log('API Response:', response)
       
-      // UPDATE ID FROM API RESPONSE IF AVAILABLE
-      if (response.data?.id) {
-        newTeacher.id = response.data.id.toString()
+      // CREATE TEACHER OBJECT FOR LOCAL ARRAY
+      const newTeacher: Teacher = {
+        id: response.data?.id?.toString() || Date.now().toString(),
+        name: `${teacherData.firstname} ${teacherData.lastname}`.trim(),
+        email: teacherData.email,
+        subject: teacherData.subject || '',
+        assignedRooms: [],
+        upcomingSchedules: 0,
       }
+      
+      // ADD TEACHER TO LOCAL ARRAY ONLY IF API SUCCESS
+      teachers.value.push(newTeacher)
+      console.log('Teacher added to local array:', newTeacher)
+      
+      return { success: true }
     }
     catch (error: any) {
-      console.warn('API call failed, but teacher will be added locally:', error)
+      console.error('API call failed:', error)
+      return { success: false, error }
     }
-    
-    // ADD TEACHER TO LOCAL ARRAY (REGARDLESS OF API SUCCESS)
-    teachers.value.push(newTeacher)
-    console.log('Teacher added to local array:', newTeacher)
-    
-    return { success: true }
   }
 
   // UPDATE TEACHER DATA
   const updateTeacher = async (id: string, updates: Partial<TeacherFormData>) => {
     try {
       await teacherService.updateTeacher(id, updates)
+      
+      // UPDATE TEACHER IN LOCAL ARRAY ONLY IF API SUCCESS
+      const index = teachers.value.findIndex(t => t.id === id)
+      if (index !== -1) {
+        const teacher = teachers.value[index]
+        if (updates.firstname || updates.lastname) {
+          teacher.name = `${updates.firstname || teacher.name.split(' ')[0]} ${updates.lastname || teacher.name.split(' ').slice(1).join(' ')}`.trim()
+        }
+        if (updates.email) teacher.email = updates.email
+        if (updates.subject) teacher.subject = updates.subject
+        
+        console.log('Teacher updated in local array:', teacher)
+      }
+      
+      return { success: true }
     }
     catch (error) {
-      console.warn('API call failed, but teacher will be updated locally:', error)
+      console.error('API call failed:', error)
+      return { success: false, error }
     }
-    
-    // UPDATE TEACHER IN LOCAL ARRAY (REGARDLESS OF API SUCCESS)
-    const index = teachers.value.findIndex(t => t.id === id)
-    if (index !== -1) {
-      const teacher = teachers.value[index]
-      if (updates.firstname || updates.lastname) {
-        teacher.name = `${updates.firstname || teacher.name.split(' ')[0]} ${updates.lastname || teacher.name.split(' ').slice(1).join(' ')}`.trim()
-      }
-      if (updates.email) teacher.email = updates.email
-      if (updates.subject) teacher.subject = updates.subject
-      
-      console.log('Teacher updated in local array:', teacher)
-    }
-    
-    return { success: true }
   }
 
   // REMOVE TEACHER BY ID
   const removeTeacher = async (id: string) => {
     try {
       await teacherService.deleteTeacher(id)
+      
+      // REMOVE TEACHER FROM LOCAL ARRAY ONLY IF API SUCCESS
+      const index = teachers.value.findIndex(t => t.id === id)
+      if (index !== -1) {
+        teachers.value.splice(index, 1)
+        console.log('Teacher removed from local array')
+      }
+      
+      return { success: true }
     }
     catch (error) {
-      console.warn('API call failed, but teacher will be removed locally:', error)
+      console.error('API call failed:', error)
+      return { success: false, error }
     }
-    
-    // REMOVE TEACHER FROM LOCAL ARRAY (REGARDLESS OF API SUCCESS)
-    const index = teachers.value.findIndex(t => t.id === id)
-    if (index !== -1) {
-      teachers.value.splice(index, 1)
-      console.log('Teacher removed from local array')
-    }
-    
-    return { success: true }
   }
 
   // GET TEACHERS BY ROOM
   const getTeachersByRoom = (room: string) => {
-    // NOTE: assignedRooms is a number (count), not an array
-    // This method needs to be updated based on actual room assignment data structure
-    console.warn('getTeachersByRoom: assignedRooms is a count, not an array of room names')
-    return []
+    return teachers.value.filter(teacher => teacher.assignedRooms.includes(room))
   }
 
   // GET TEACHERS BY SUBJECT
@@ -111,23 +106,17 @@ export const useTeacherStore = defineStore('teachers', () => {
 
   // ASSIGN ROOM TO TEACHER
   const assignRoomToTeacher = (teacherId: string, room: string) => {
-    // NOTE: assignedRooms is a number (count), not an array
-    // This method needs API integration for actual room assignment
-    console.warn('assignRoomToTeacher: Needs API implementation')
     const teacher = getTeacherById(teacherId)
-    if (teacher) {
-      teacher.assignedRooms += 1
+    if (teacher && !teacher.assignedRooms.includes(room)) {
+      teacher.assignedRooms.push(room)
     }
   }
 
   // UNASSIGN ROOM FROM TEACHER
   const unassignRoomFromTeacher = (teacherId: string, room: string) => {
-    // NOTE: assignedRooms is a number (count), not an array
-    // This method needs API integration for actual room unassignment
-    console.warn('unassignRoomFromTeacher: Needs API implementation')
     const teacher = getTeacherById(teacherId)
-    if (teacher && teacher.assignedRooms > 0) {
-      teacher.assignedRooms -= 1
+    if (teacher) {
+      teacher.assignedRooms = teacher.assignedRooms.filter(r => r !== room)
     }
   }
 
@@ -159,17 +148,15 @@ export const useTeacherStore = defineStore('teachers', () => {
 
       const userMap = new Map(userList.map(u => [u.id, u.email?.trim() ?? 'No email']))
 
-      teachers.value = teacherList.map(t => {
+      teachers.value = teacherList.map((t, index) => {
         const mappedTeacher = {
-          id: t.id?.toString() || '',
+          id: t.id?.toString() || `temp-${Date.now()}-${index}`,
           name: `${t.firstname ?? ''} ${t.lastname ?? ''}`.trim() || 'No name',
           email: userMap.get(t.user_id) ?? 'No email',
           subject: t.subject ?? 'No subject',
           assignedRooms: Array.isArray(t.assignedRooms)
             ? t.assignedRooms
-            : typeof t.assignedRooms === 'number'
-              ? [t.assignedRooms]
-              : [],
+            : [],
           upcomingSchedules: t.upcomingSchedules ?? 0,
           avatar: t.avatar || undefined,
         }

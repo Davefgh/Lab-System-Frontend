@@ -8,6 +8,8 @@ import ToastNotification from "@/components/global/ToastNotification.vue";
 import { useTeacherStore } from "@/stores/teachers";
 import type { Teacher } from "@/interfaces/interfaces";
 
+import { useScheduleStore } from "@/stores/schedules";
+
 // CONSTANTS
 const todaySchedule = [
 	{
@@ -39,6 +41,7 @@ const showModal = ref(false);
 const modalMode = ref<"add" | "edit">("add");
 const selectedTeacher = ref<Teacher | null>(null);
 const isLoading = ref(false);
+const isScheduleLoading = ref(false);
 
 // TOAST NOTIFICATION STATE
 const toastMessage = ref("");
@@ -48,12 +51,16 @@ const showToast = ref(false);
 const newSchedule = ref({
 	teacherId: "",
 	room: "",
+	subject: "",
+	section: "",
+	date: "",
 	startTime: "",
 	endTime: "",
 });
 
 // STORE INITIALIZATION
 const teacherStore = useTeacherStore();
+const scheduleStore = useScheduleStore();
 
 // COMPUTED PROPERTIES
 const teachers = computed(() => teacherStore.teachers);
@@ -118,7 +125,47 @@ async function saveTeacher(teacherData: any) {
 			if (result.success) {
 				showNotification("Teacher added successfully!", "success");
 			} else {
-				showNotification("Failed to add teacher. Please try again.", "error");
+				let errorMsg = "Failed to add teacher. Please try again.";
+				const err = result.error;
+				if (err?.response?.data) {
+					const data = err.response.data;
+					if (data.message) {
+						errorMsg = data.message;
+					} else if (data.error) {
+						// Handle nested error object (e.g. ZodError)
+						if (typeof data.error === "string") {
+							errorMsg = data.error;
+						} else if (data.error.message) {
+							try {
+								// Try to parse stringified JSON error array
+								const parsed = JSON.parse(data.error.message);
+								if (Array.isArray(parsed)) {
+									errorMsg = parsed.map((e: any) => e.message).join(", ");
+								} else {
+									errorMsg = data.error.message;
+								}
+							} catch {
+								errorMsg = data.error.message;
+							}
+						}
+					} else if (data.errors) {
+						// Handle validation errors object (e.g., { email: ['Invalid'], password: ['Too short'] })
+						const messages = Object.values(data.errors).flat();
+						errorMsg = messages.join(", ");
+					} else if (typeof data === "string") {
+						errorMsg = data;
+					} else {
+						// Fallback to stringifying data if it's an unknown object
+						try {
+							errorMsg = JSON.stringify(data);
+						} catch (e) {
+							errorMsg = err.message || errorMsg;
+						}
+					}
+				} else if (err?.message) {
+					errorMsg = err.message;
+				}
+				showNotification(errorMsg, "error");
 			}
 		} else if (selectedTeacher.value) {
 			const result = await teacherStore.updateTeacher(selectedTeacher.value.id, teacherData);
@@ -158,24 +205,61 @@ async function deleteTeacher(teacherId: string) {
 }
 
 // ADD NEW SCHEDULE FOR TEACHER
-function addSchedule() {
+async function addSchedule() {
 	// VALIDATE ALL REQUIRED FIELDS
 	if (
 		newSchedule.value.teacherId &&
 		newSchedule.value.room &&
+		newSchedule.value.subject &&
+		newSchedule.value.section &&
+		newSchedule.value.date &&
 		newSchedule.value.startTime &&
 		newSchedule.value.endTime
 	) {
-		// TODO: Integrate with schedules store when available
-		console.log("Adding Schedule:", newSchedule.value);
+		isScheduleLoading.value = true;
+		try {
+			// Format dates as ISO strings (combining date and time)
+			// Assuming backend expects ISO string or similar
+			const startDateTime = `${newSchedule.value.date}T${newSchedule.value.startTime}:00`;
+			const endDateTime = `${newSchedule.value.date}T${newSchedule.value.endTime}:00`;
 
-		// RESET FORM FIELDS
-		newSchedule.value = {
-			teacherId: "",
-			room: "",
-			startTime: "",
-			endTime: "",
-		};
+			const scheduleData = {
+				laboratory_id: newSchedule.value.room,
+				teacher_id: newSchedule.value.teacherId,
+				subject_id: newSchedule.value.subject, // Assuming subject input is the ID/Code
+				section: newSchedule.value.section,
+				start_time: startDateTime,
+				end_time: endDateTime,
+				status: "active",
+			};
+
+			console.log("Adding Schedule:", scheduleData);
+			const result = await scheduleStore.addSchedule(scheduleData);
+
+			if (result.success) {
+				showNotification("Schedule added successfully!", "success");
+				// RESET FORM FIELDS
+				newSchedule.value = {
+					teacherId: "",
+					room: "",
+					subject: "",
+					section: "",
+					date: "",
+					startTime: "",
+					endTime: "",
+				};
+			} else {
+				const errorMsg = result.error?.response?.data?.message || "Failed to add schedule.";
+				showNotification(errorMsg, "error");
+			}
+		} catch (error) {
+			console.error("Error adding schedule:", error);
+			showNotification("An error occurred while adding schedule.", "error");
+		} finally {
+			isScheduleLoading.value = false;
+		}
+	} else {
+		showNotification("Please fill in all fields.", "error");
 	}
 }
 </script>
@@ -196,9 +280,12 @@ function addSchedule() {
 		</div>
 
 		<div class="bg-white rounded-lg shadow overflow-hidden mb-6">
-			<!-- SEARCH BAR -->
 			<div class="p-4 border-b border-gray-200 flex items-center justify-between">
 				<SearchFilterBar v-model="searchQuery" placeholder="Search teachers..." />
+				<div class="text-xs text-gray-400">
+					Debug: {{ filteredTeachers.length }} teachers, Loading: {{ teacherStore.isLoading }},
+					Error: {{ teacherStore.error }}
+				</div>
 			</div>
 
 			<!-- TEACHERS TABLE -->
@@ -316,6 +403,7 @@ function addSchedule() {
 			</div>
 
 			<!-- ADD NEW SCHEDULE -->
+			<!-- ADD NEW SCHEDULE -->
 			<div class="bg-white rounded-lg shadow p-6">
 				<h3 class="text-lg font-medium text-gray-800 mb-4">Add New Schedule</h3>
 				<div class="space-y-4">
@@ -338,10 +426,40 @@ function addSchedule() {
 							class="block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#4299e1] focus:border-[#4299e1]"
 						>
 							<option value="">Select Room</option>
-							<option>Room 101</option>
-							<option>Room 102</option>
-							<option>Room 103</option>
+							<option value="1">Slab 1</option>
+							<option value="2">Slab 2</option>
+							<option value="3">Slab 3</option>
+							<option value="4">Slab 4</option>
+							<option value="5">Slab 5</option>
+							<option value="6">SCLAB</option>
+							<option value="7">Linux</option>
 						</select>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+						<input
+							v-model="newSchedule.subject"
+							type="text"
+							placeholder="Enter Subject"
+							class="block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#4299e1] focus:border-[#4299e1]"
+						/>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-1">Section</label>
+						<input
+							v-model="newSchedule.section"
+							type="text"
+							placeholder="Enter Section"
+							class="block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#4299e1] focus:border-[#4299e1]"
+						/>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+						<input
+							v-model="newSchedule.date"
+							type="date"
+							class="block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#4299e1] focus:border-[#4299e1]"
+						/>
 					</div>
 					<div class="grid grid-cols-2 gap-4">
 						<div>
@@ -362,10 +480,11 @@ function addSchedule() {
 						</div>
 					</div>
 					<button
-						class="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-[#2b6cb0] transition-colors"
+						class="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-[#2b6cb0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 						@click="addSchedule"
+						:disabled="isScheduleLoading"
 					>
-						Add Schedule
+						{{ isScheduleLoading ? "Adding..." : "Add Schedule" }}
 					</button>
 				</div>
 			</div>

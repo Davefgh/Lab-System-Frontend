@@ -4,7 +4,11 @@ export interface TeacherFormData {
   firstname: string
   lastname: string
   email: string
-  subject: string
+  username: string
+  password?: string
+  confirm_password?: string
+  user_type: string
+  subject?: string
   user_id?: string
 }
 
@@ -24,9 +28,9 @@ export const teacherService = {
     return apiService.get(`/teachers/${id}`)
   },
 
-  // CREATE NEW TEACHER
+  // CREATE NEW TEACHER (Creates a User)
   createTeacher: async (teacherData: TeacherFormData) => {
-    return apiService.post<TeacherApiResponse>('/teachers', teacherData)
+    return apiService.post<TeacherApiResponse>('/users', teacherData)
   },
 
   // UPDATE TEACHER
