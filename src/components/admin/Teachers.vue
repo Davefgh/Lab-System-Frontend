@@ -166,6 +166,7 @@ function addSchedule() {
 		newSchedule.value.startTime &&
 		newSchedule.value.endTime
 	) {
+		// TODO: Integrate with schedules store when available
 		console.log("Adding Schedule:", newSchedule.value);
 
 		// RESET FORM FIELDS
