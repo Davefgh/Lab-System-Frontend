@@ -3,6 +3,7 @@ import type { Teacher } from '@/interfaces/interfaces'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import api from '@/boot/axios'
+import { teacherService, type TeacherFormData } from '@/services/teacherService'
 
 // TEACHER STORE DEFINITION
 export const useTeacherStore = defineStore('teachers', () => {
@@ -19,33 +20,53 @@ export const useTeacherStore = defineStore('teachers', () => {
   }
 
   // ADD NEW TEACHER
-  const addTeacher = (teacher: Omit<Teacher, 'id'>) => {
-    const newTeacher: Teacher = {
-      ...teacher,
-      id: Date.now().toString(),
+  const addTeacher = async (teacherData: TeacherFormData) => {
+    try {
+      await teacherService.createTeacher(teacherData)
+      // REFRESH TEACHER LIST AFTER ADDING
+      await fetchTeachers()
+      return { success: true }
     }
-    teachers.value.push(newTeacher)
+    catch (error) {
+      console.error('Error adding teacher:', error)
+      return { success: false, error }
+    }
   }
 
   // UPDATE TEACHER DATA
-  const updateTeacher = (id: string, updates: Partial<Teacher>) => {
-    const index = teachers.value.findIndex(teacher => teacher.id === id)
-    if (index > -1) {
-      teachers.value[index] = { ...teachers.value[index], ...updates }
+  const updateTeacher = async (id: string, updates: Partial<TeacherFormData>) => {
+    try {
+      await teacherService.updateTeacher(id, updates)
+      // REFRESH TEACHER LIST AFTER UPDATING
+      await fetchTeachers()
+      return { success: true }
+    }
+    catch (error) {
+      console.error('Error updating teacher:', error)
+      return { success: false, error }
     }
   }
 
   // REMOVE TEACHER BY ID
-  const removeTeacher = (id: string) => {
-    const index = teachers.value.findIndex(teacher => teacher.id === id)
-    if (index > -1) {
-      teachers.value.splice(index, 1)
+  const removeTeacher = async (id: string) => {
+    try {
+      await teacherService.deleteTeacher(id)
+      // REFRESH TEACHER LIST AFTER DELETION
+      await fetchTeachers()
+      return { success: true }
+    }
+    catch (error) {
+      console.error('Error removing teacher:', error)
+      return { success: false, error }
     }
   }
 
   // GET TEACHERS BY ROOM
   const getTeachersByRoom = (room: string) => {
-    return teachers.value.filter(teacher => teacher.assignedRooms.includes(room))
+    // NOTE: assignedRooms is a number (count), not an array
+    // This method needs to be updated based on actual room assignment data structure
+    console.warn('getTeachersByRoom: assignedRooms is a count, not an array of room names')
+    return []
   }
 
   // GET TEACHERS BY SUBJECT
@@ -55,20 +76,23 @@ export const useTeacherStore = defineStore('teachers', () => {
 
   // ASSIGN ROOM TO TEACHER
   const assignRoomToTeacher = (teacherId: string, room: string) => {
+    // NOTE: assignedRooms is a number (count), not an array
+    // This method needs API integration for actual room assignment
+    console.warn('assignRoomToTeacher: Needs API implementation')
     const teacher = getTeacherById(teacherId)
-    if (teacher && !teacher.assignedRooms.includes(room)) {
-      teacher.assignedRooms.push(room)
+    if (teacher) {
+      teacher.assignedRooms += 1
     }
   }
 
   // UNASSIGN ROOM FROM TEACHER
   const unassignRoomFromTeacher = (teacherId: string, room: string) => {
+    // NOTE: assignedRooms is a number (count), not an array
+    // This method needs API integration for actual room unassignment
+    console.warn('unassignRoomFromTeacher: Needs API implementation')
     const teacher = getTeacherById(teacherId)
-    if (teacher) {
-      const index = teacher.assignedRooms.indexOf(room)
-      if (index > -1) {
-        teacher.assignedRooms.splice(index, 1)
-      }
+    if (teacher && teacher.assignedRooms > 0) {
+      teacher.assignedRooms -= 1
     }
   }
 
